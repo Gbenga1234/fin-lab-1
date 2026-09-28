@@ -40,7 +40,7 @@ class AccountAndTransferApiTests(APITestCase):
             {
                 'reference': 'transfer-success-1',
                 'source_account': source.pk,
-                'destination_account': destination.pk,
+                'destination_account': destination.account_number,
                 'amount': '30.00',
             },
             format='json',
@@ -114,6 +114,27 @@ class AccountAndTransferApiTests(APITestCase):
             {
                 'reference': 'transfer-forbidden-1',
                 'source_account': source.pk,
+                'destination_account': destination.account_number,
+                'amount': '1.00',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_destination_must_be_identified_by_account_number(self):
+        other_user = get_user_model().objects.create_user(
+            username='other',
+            password='Safe-password-938!',
+        )
+        source = Account.objects.create(owner=self.user, balance=Decimal('10.00'))
+        destination = Account.objects.create(owner=other_user)
+
+        response = self.client.post(
+            '/api/transactions/',
+            {
+                'reference': 'transfer-by-pk-1',
+                'source_account': source.pk,
                 'destination_account': destination.pk,
                 'amount': '1.00',
             },
@@ -121,3 +142,29 @@ class AccountAndTransferApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
+        self.assertIn('destination_account', response.data)
+
+    def test_transfers_cannot_be_modified_or_deleted(self):
+        source = Account.objects.create(owner=self.user, balance=Decimal('10.00'))
+        destination = Account.objects.create(owner=self.user)
+        transfer = Transaction.objects.create(
+            reference='transfer-immutable-1',
+            owner=self.user,
+            source_account=source,
+            destination_account=destination,
+            amount=Decimal('5.00'),
+            currency='USD',
+        )
+        url = f'/api/transactions/{transfer.pk}/'
+        payload = {
+            'reference': 'transfer-immutable-1',
+            'source_account': source.pk,
+            'destination_account': destination.account_number,
+            'amount': '9.00',
+        }
+
+        self.assertEqual(self.client.put(url, payload, format='json').status_code, 405)
+        self.assertEqual(self.client.patch(url, {'amount': '9.00'}, format='json').status_code, 405)
+        self.assertEqual(self.client.delete(url).status_code, 405)
+        transfer.refresh_from_db()
+        self.assertEqual(transfer.amount, Decimal('5.00'))

@@ -5,9 +5,17 @@ from accounts.models import Account
 from .models import Transaction
 
 
+class OwnedAccountField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        return Account.objects.filter(owner=self.context['request'].user)
+
+
 class TransactionSerializer(serializers.ModelSerializer):
-    source_account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all())
-    destination_account = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all())
+    source_account = OwnedAccountField()
+    destination_account = serializers.SlugRelatedField(
+        slug_field='account_number',
+        queryset=Account.objects.all(),
+    )
 
     class Meta:
         model = Transaction
@@ -23,12 +31,9 @@ class TransactionSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        request_user = self.context['request'].user
         source = attrs['source_account']
         destination = attrs['destination_account']
 
-        if source.owner_id != request_user.id:
-            raise serializers.ValidationError({'source_account': 'You do not own this account.'})
         if source.pk == destination.pk:
             raise serializers.ValidationError({'destination_account': 'Choose a different account.'})
         if source.currency != destination.currency:

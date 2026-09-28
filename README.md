@@ -34,7 +34,7 @@ The Django API is divided into `identity`, `accounts`, `core` (transfers), and `
 - `POST /api/auth/login/` returns a token. Send it as `Authorization: Token <token>` to protected endpoints.
 - `GET /api/auth/me/` returns the authenticated user; `POST /api/auth/logout/` revokes the token.
 - `GET` and `POST /api/accounts/` list or create accounts. New accounts start at zero; balances are read-only through the API.
-- `GET` and `POST /api/transactions/` list transfers or queue a transfer. Create with `reference`, `source_account`, `destination_account`, and `amount`; both accounts must use the same currency.
+- `GET` and `POST /api/transactions/` list transfers or queue a transfer. Create with `reference`, `source_account` (the id of one of your accounts), `destination_account` (the recipient's 16-character `account_number`), and `amount`; both accounts must use the same currency. Transfers are immutable once created: `PUT`, `PATCH`, and `DELETE` are not allowed.
 - `GET /api/notifications/` lists the authenticated user's notifications. `POST /api/notifications/{id}/read/` marks one as read.
 
 Transfers settle in the Celery worker. Insufficient funds or inactive accounts fail without changing balances. This scaffold has no deposit/funding endpoint or external email/SMS provider.
